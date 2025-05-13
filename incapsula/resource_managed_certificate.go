@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -83,7 +84,17 @@ func resourceManagedCertificateAdd(ctx context.Context, d *schema.ResourceData, 
 	validationMethod, _ := d.Get("default_validation_method").(string)
 	id, _ := strconv.Atoi(siteId)
 	log.Printf("[INFO] requesting site cert to site ID: %d to %v", id, d)
-	siteCertificateV3Response, diags := client.RequestSiteCertificate(id, validationMethod, accountId)
+	var siteCertificateV3Response *SiteCertificateV3Response
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		siteCertificateV3Response, diags = client.RequestSiteCertificate(id, validationMethod, accountId)
+		if diags == nil {
+			break
+		}
+		delay := time.Duration(10 * attempt)
+		log.Printf("[DEBUG] going to sleep for %d[sec] before the next retry", delay)
+		time.Sleep(delay * time.Second)
+	}
 	if diags != nil && diags.HasError() {
 		log.Printf("[ERROR] failed request site cert to site ID: %d, %v\n", id, diags)
 		return diags
