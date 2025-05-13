@@ -78,17 +78,16 @@ func (c *Client) RequestSiteCertificate(siteId int, validationMethod string, acc
 	}
 
 	// Retry on HTTP error response
-	retries := 0
-	for err == nil && resp.StatusCode != 200 && retries < certRequestRetries {
+	retries := certRequestRetries
+	for err == nil && resp.StatusCode != 200 && retries > 0 {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
 			Summary:  "Error response from Imperva service on request site certificate. Retrying...",
 			Detail:   fmt.Sprintf("Failed to request site certificate for site %d, got response status %d", siteId, resp.StatusCode),
 		})
 
-		retries += 1
-		delay := time.Duration(sleepBeforeRequestSeconds * retries)
-		time.Sleep(delay * time.Second)
+		retries -= 1
+		time.Sleep(sleepBeforeRequestSeconds * time.Second)
 
 		resp, err = c.DoJsonAndQueryParamsRequestWithHeaders(http.MethodPost, url, []byte(siteCertificateDTOJSON), nil, RequestSiteCert)
 	}
